@@ -2,6 +2,7 @@
 #include "fpv_protocol.h"
 #include "e32_lora.h"
 #include "ssd1306_min.h"
+#include "e32_config.h";
 
 UART_HandleTypeDef huart1;
 I2C_HandleTypeDef hi2c1;
@@ -125,6 +126,8 @@ int main(void)
     MX_USART1_UART_Init();
     MX_I2C1_Init();
 
+
+
     e32_t lora =
     {
         .huart = &huart1,
@@ -136,11 +139,13 @@ int main(void)
         .aux_pin = LoRa_AUX_Pin
     };
 
-    e32_normal(&lora);
+    e32_bypass_aux(1,1);
+    HAL_StatusTypeDef st = e32_write_config_fixed(&lora, 2, 0x17);
+    e32_bypass_aux(0,0);
 
     ssd1306_init(&hi2c1);
     ssd1306_clear();
-    ssd1306_print(0, 0, "FPV RX READY");
+    ssd1306_print(0, 0, "FPV RX READY !!!");
     ssd1306_update();
 
     uint8_t my_id = read_receiver_dip();
@@ -221,10 +226,18 @@ static void MX_GPIO_Init(void)
 
     HAL_GPIO_WritePin(GPIOB, LoRa_M0_Pin | LoRa_M1_Pin | BUZZER_Pin, GPIO_PIN_RESET);
 
-    GPIO_InitStruct.Pin = ADDR0_RX_Pin | ADDR1_RX_Pin | ADDR2_RX_Pin;
+    // Set 0 and 2 to 0
+    GPIO_InitStruct.Pin = ADDR0_RX_Pin | ADDR2_RX_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_PULLDOWN;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    // Set 1 to 1
+    GPIO_InitStruct.Pin = ADDR1_RX_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull = GPIO_PULLUP;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
 
     GPIO_InitStruct.Pin = LoRa_M0_Pin | LoRa_M1_Pin | BUZZER_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;

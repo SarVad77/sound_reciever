@@ -1,12 +1,16 @@
 #include "e32_lora.h"
 
+static int bypass_aux = 0;
+static int bypass_aux_permanent = 0;
+
 void e32_wait_aux(e32_t *e)
 {
-    while (HAL_GPIO_ReadPin(e->aux_port, e->aux_pin) == GPIO_PIN_RESET)
+    if (!bypass_aux) // normal mode, wait aux
+    while (HAL_GPIO_ReadPin(e->aux_port, e->aux_pin) != GPIO_PIN_SET)
     {
     }
-
     HAL_Delay(2);
+    if (!bypass_aux_permanent) bypass_aux = 0; // Reset bypass_aux value if permanent is not set
 }
 
 void e32_normal(e32_t *e)
@@ -62,4 +66,10 @@ HAL_StatusTypeDef e32_receive(
 )
 {
     return HAL_UART_Receive(e->huart, data, len, timeout);
+}
+
+void e32_bypass_aux(int i_bypass_aux, int i_permanent)
+{
+	bypass_aux = i_bypass_aux; // Set bypass_aux mode
+	bypass_aux_permanent = i_permanent; // No reset after wait execution
 }

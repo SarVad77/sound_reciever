@@ -24,6 +24,7 @@ typedef struct
 void e32_normal(e32_t *e);
 void e32_config(e32_t *e);
 void e32_wait_aux(e32_t *e);
+void e32_bypass_aux(int i_bypass_aux, int i_permanent);
 
 HAL_StatusTypeDef e32_send_fixed(
     e32_t *e,
