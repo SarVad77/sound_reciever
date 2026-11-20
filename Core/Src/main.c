@@ -2,7 +2,11 @@
 #include "fpv_protocol.h"
 #include "e32_lora.h"
 #include "ssd1306_min.h"
-#include "e32_config.h";
+#include "ssd1306.h"
+#include "fonts.h"
+#include "e32_config.h"
+
+#include <stdlib.h>
 
 UART_HandleTypeDef huart1;
 I2C_HandleTypeDef hi2c1;
@@ -90,6 +94,8 @@ static void draw_detector_table(uint8_t my_id)
     ssd1306_print(0, 0, "RX:");
     ssd1306_print_num(20, 0, "", my_id);
     ssd1306_print(42, 0, "ID S SCORE");
+	ssd1306_update();
+
 
     for (int i = 0; i < DETECTOR_TABLE_SIZE; i++)
     {
@@ -97,13 +103,14 @@ static void draw_detector_table(uint8_t my_id)
 
         if (!detectors[i].active)
         {
-            ssd1306_print(0, y, "--");
+        	ssd1306_print(0, y, "--");
             continue;
         }
 
         uint32_t age = (HAL_GetTick() - detectors[i].last_seen) / 1000;
 
         ssd1306_print_num(0, y, "", detectors[i].detector_id);
+
 
         if (detectors[i].threat)
             ssd1306_print(24, y, "ALR");
@@ -139,12 +146,14 @@ int main(void)
         .aux_pin = LoRa_AUX_Pin
     };
 
-    e32_bypass_aux(1,1);
-    HAL_StatusTypeDef st = e32_write_config_fixed(&lora, 2, 0x17);
-    e32_bypass_aux(0,0);
+    //e32_wait_aux(&lora);
+
+	e32_write_config_fixed(&lora, 2, 0x17);
 
     ssd1306_init(&hi2c1);
+
     ssd1306_clear();
+    ssd1306_set_current_font(SSD1306_MEDIUM_FONT,0);
     ssd1306_print(0, 0, "FPV RX READY !!!");
     ssd1306_update();
 
