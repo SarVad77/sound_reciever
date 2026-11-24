@@ -5,8 +5,14 @@
 #include "ssd1306.h"
 #include "fonts.h"
 #include "e32_config.h"
+//#include "alarm.h"
+#include "delayer.h"
+#include "button2.h"
 
 #include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
 
 UART_HandleTypeDef huart1;
 I2C_HandleTypeDef hi2c1;
@@ -26,6 +32,29 @@ typedef struct
 
 detector_entry_t detectors[DETECTOR_TABLE_SIZE];
 
+static delay_t delay;
+static button_t button;
+static int8_t bstate = 0;
+
+static uint8_t muted = 0;
+
+
+__weak void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+  /* Prevent unused argument(s) compilation warning */
+  UNUSED(GPIO_Pin);
+  /* NOTE: This function Should not be modified, when the callback is needed,
+           the HAL_GPIO_EXTI_Callback could be implemented in the user file
+   */
+  if (GPIO_Pin != button.h_button_pin)
+	  return;
+
+  uint8_t pressed = button_pressed(&button); // 0 - unpressed, 1 - pressed
+  button_irq_handler(&button, pressed);
+}
+
+
+
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
@@ -42,6 +71,7 @@ static uint8_t read_receiver_dip(void)
     return v & 0x07;
 }
 
+
 static void buzzer_on(void)
 {
     HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, GPIO_PIN_SET);
@@ -51,6 +81,7 @@ static void buzzer_off(void)
 {
     HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, GPIO_PIN_RESET);
 }
+
 
 static void detector_table_update(fpv_packet_t *p)
 {
@@ -111,11 +142,19 @@ static void draw_detector_table(uint8_t my_id)
 
         ssd1306_print_num(0, y, "", detectors[i].detector_id);
 
+        char msg[4];
+
 
         if (detectors[i].threat)
-            ssd1306_print(24, y, "ALR");
+            sprintf(msg,"ALR");
         else
-            ssd1306_print(24, y, "OK ");
+        	sprintf(msg,"OK ");
+
+        if (muted)
+        	sprintf(msg,"N/A");
+
+
+        ssd1306_print(24, y, msg);
 
         ssd1306_print_num(54, y, "", detectors[i].fpv_score);
         ssd1306_print_num(100, y, "", age);
@@ -126,7 +165,8 @@ static void draw_detector_table(uint8_t my_id)
 
 int main(void)
 {
-    HAL_Init();
+
+	HAL_Init();
     SystemClock_Config();
 
     MX_GPIO_Init();
@@ -153,14 +193,31 @@ int main(void)
     ssd1306_init(&hi2c1);
 
     ssd1306_clear();
-    ssd1306_set_current_font(SSD1306_MEDIUM_FONT,0);
-    ssd1306_print(0, 0, "FPV RX READY !!!");
+    ssd1306_set_current_font(SSD1306_MEDIUM_FONT,1);
+    ssd1306_print(0, 0, "FPV RX");
+    ssd1306_print(0,19, "READY !!!");
+
     ssd1306_update();
+    HAL_Delay(500);
+
+    ssd1306_set_current_font(SSD1306_DEFAULT_FONT,0);
 
     uint8_t my_id = read_receiver_dip();
 
     uint32_t last_alarm_time = 0;
     uint32_t last_oled_update = 0;
+
+
+    button.h_button_port = GPIOB;
+    button.h_button_pin = GPIO_PIN_13;
+
+    init_button(&button);
+
+    //alarm_init();
+    //uint8_t g_rx_byte;
+    //HAL_UART_Receive_IT(&huart1, &g_rx_byte, 1);
+
+
 
     while (1)
     {
@@ -175,12 +232,17 @@ int main(void)
                     detector_table_update(&packet);
                     draw_detector_table(my_id);
 
-                    if (packet.threat)
+                    if (packet.threat && !muted)
                     {
                         buzzer_on();
                         last_alarm_time = HAL_GetTick();
                     }
+
+                    //alarm_update(packet.seq, packet.threat);
+
                 }
+
+
             }
         }
 
@@ -192,7 +254,28 @@ int main(void)
             draw_detector_table(my_id);
             last_oled_update = HAL_GetTick();
         }
+
+        button_query(&button);
+        bstate = button_result(&button);
+
+        if (bstate == 1)
+        {
+        	set_delay(&delay, 15000);
+        	muted = 1;
+        }
+
+        if (bstate == 2)
+        {
+            reset_delay(&delay);
+            muted = 0;
+        }
+
+        if (get_delay(&delay))
+        	muted = 0;
+
+      //  alarm_button_poll();
     }
+
 }
 
 static void MX_USART1_UART_Init(void)
@@ -242,7 +325,7 @@ static void MX_GPIO_Init(void)
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
     // Set 1 to 1
-    GPIO_InitStruct.Pin = ADDR1_RX_Pin;
+    GPIO_InitStruct.Pin = ADDR1_RX_Pin ;
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_PULLUP;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
@@ -258,6 +341,18 @@ static void MX_GPIO_Init(void)
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : KNOBKA_Int_Pin */
+  GPIO_InitStruct.Pin = KNOBKA_Int_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(KNOBKA_Int_GPIO_Port, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+
+
 }
 
 void SystemClock_Config(void)

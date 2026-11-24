@@ -54,6 +54,7 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
 
+
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
@@ -75,6 +76,10 @@ void Error_Handler(void);
 #define SCREEN_SCL_GPIO_Port GPIOB
 #define SCREEN_SDA_Pin GPIO_PIN_7
 #define SCREEN_SDA_GPIO_Port GPIOB
+#define KNOBKA_Int_Pin GPIO_PIN_13
+#define KNOBKA_Int_GPIO_Port GPIOB
+#define KNOBKA_Int_EXTI_IRQn EXTI15_10_IRQn
+
 
 /* USER CODE BEGIN Private defines */
 
