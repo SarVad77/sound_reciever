@@ -153,7 +153,6 @@ static void draw_detector_table(uint8_t my_id)
         if (muted)
         	sprintf(msg,"N/A");
 
-
         ssd1306_print(24, y, msg);
 
         ssd1306_print_num(54, y, "", detectors[i].fpv_score);
@@ -318,18 +317,11 @@ static void MX_GPIO_Init(void)
 
     HAL_GPIO_WritePin(GPIOB, LoRa_M0_Pin | LoRa_M1_Pin | BUZZER_Pin, GPIO_PIN_RESET);
 
-    // Set 0 and 2 to 0
-    GPIO_InitStruct.Pin = ADDR0_RX_Pin | ADDR2_RX_Pin;
-    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-    GPIO_InitStruct.Pull = GPIO_PULLDOWN;
-    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-    // Set 1 to 1
-    GPIO_InitStruct.Pin = ADDR1_RX_Pin ;
+    // Set all to 1
+    GPIO_InitStruct.Pin = ADDR0_RX_Pin | ADDR1_RX_Pin | ADDR2_RX_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_PULLUP;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
 
     GPIO_InitStruct.Pin = LoRa_M0_Pin | LoRa_M1_Pin | BUZZER_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
