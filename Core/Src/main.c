@@ -34,7 +34,7 @@ detector_entry_t detectors[DETECTOR_TABLE_SIZE];
 
 static delay_t delay;
 static button_t button;
-static int8_t bstate = 0;
+static uint8_t bstate = 0;
 
 static uint8_t muted = 0;
 
@@ -142,7 +142,7 @@ static void draw_detector_table(uint8_t my_id)
 
         ssd1306_print_num(0, y, "", detectors[i].detector_id);
 
-        char msg[4];
+        char msg[5];
 
 
         if (detectors[i].threat)
@@ -151,7 +151,7 @@ static void draw_detector_table(uint8_t my_id)
         	sprintf(msg,"OK ");
 
         if (muted)
-        	sprintf(msg,"N/A");
+        	sprintf(msg,"X%2d",muted);
 
         ssd1306_print(24, y, msg);
 
@@ -210,6 +210,8 @@ int main(void)
     button.h_button_port = GPIOB;
     button.h_button_pin = GPIO_PIN_13;
 
+    button.s_max_pressed_count = 3;
+
     init_button(&button);
 
     //alarm_init();
@@ -257,20 +259,25 @@ int main(void)
         button_query(&button);
         bstate = button_result(&button);
 
-        if (bstate == 1)
+        if (bstate)
         {
-        	set_delay(&delay, 15000);
-        	muted = 1;
-        }
+            if (bstate >=4 )
+            {
+                reset_delay(&delay);
+                muted = 0;
+            }
+            else
+            {
+            	muted = bstate*15;  // Once - 15 sec, Twice - 30 sec, Three times - 45 sec, HOLD - unmute
+            	set_delay(&delay, muted*1000);
+            }
 
-        if (bstate == 2)
-        {
-            reset_delay(&delay);
-            muted = 0;
         }
 
         if (get_delay(&delay))
         	muted = 0;
+
+
 
       //  alarm_button_poll();
     }
